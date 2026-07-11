@@ -59,7 +59,14 @@ class PushManager {
       }
     }
 
-    await Promise.allSettled(promises);
+    const results = await Promise.allSettled(promises);
+    const succeeded = results.filter(result => result.status === 'fulfilled' && result.value === true).length;
+
+    return {
+      attempted: results.length,
+      succeeded,
+      failed: results.length - succeeded
+    };
   }
 
   /**

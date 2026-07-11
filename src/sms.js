@@ -218,17 +218,25 @@ class SMSProcessor {
     const messageRecord = this.addReceivedMessage(sender, text, timestamp, simIdentity);
 
     // 推送到所有通道
-    await this.pushManager.pushToAll(sender, text, timestamp);
+    const pushResult = await this.pushManager.pushToAll(sender, text, timestamp);
 
     // 发送邮件通知
     const subject = `短信${sender},${text.substring(0, 20)}`;
     const body = `来自：${sender}，时间：${timestamp}，内容：${text}`;
-    await this.pushManager.sendEmail(subject, body);
+    const emailAttempted = Boolean(this.pushManager.smtpTransporter);
+    const emailSucceeded = await this.pushManager.sendEmail(subject, body);
 
-    this.updateReceivedMessage(messageRecord.id, {
-      status: 'forwarded',
-      statusText: '已转发'
-    });
+    const attempted = pushResult.attempted + (emailAttempted ? 1 : 0);
+    const succeeded = pushResult.succeeded + (emailSucceeded ? 1 : 0);
+    const status = attempted === 0
+      ? { status: 'received', statusText: '未配置转发' }
+      : succeeded === attempted
+        ? { status: 'forwarded', statusText: '已转发' }
+        : succeeded > 0
+          ? { status: 'partial_failure', statusText: '部分转发失败' }
+          : { status: 'failed', statusText: '转发失败' };
+
+    this.updateReceivedMessage(messageRecord.id, status);
   }
 
   /**
