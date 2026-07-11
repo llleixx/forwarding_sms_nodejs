@@ -221,16 +221,39 @@ class PushManager {
    * 自定义模板推送
    */
   async pushCustom(channel, sender, message, timestamp) {
-    let body = channel.customBody || '{}';
-    body = body.replace('{sender}', sender);
-    body = body.replace('{message}', message);
-    body = body.replace('{timestamp}', timestamp);
+    const template = JSON.parse(channel.customBody || '{}');
+    const body = this.applyCustomTemplate(template, {
+      sender,
+      message,
+      timestamp
+    });
 
-    const response = await axios.post(channel.url, JSON.parse(body), {
+    const response = await axios.post(channel.url, body, {
       timeout: 10000
     });
     logger.info(`✓ 自定义推送成功: ${response.status}`);
     return true;
+  }
+
+  applyCustomTemplate(value, variables) {
+    if (typeof value === 'string') {
+      return Object.entries(variables).reduce(
+        (result, [name, replacement]) => result.split(`{${name}}`).join(String(replacement ?? '')),
+        value
+      );
+    }
+
+    if (Array.isArray(value)) {
+      return value.map(item => this.applyCustomTemplate(item, variables));
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [key, this.applyCustomTemplate(item, variables)])
+      );
+    }
+
+    return value;
   }
 
   /**
