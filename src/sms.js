@@ -301,7 +301,9 @@ class SMSProcessor {
       : (this.shouldDefaultToAllSimMessages() ? 'all' : 'current');
     const currentSim = this.normalizeSimIdentity(options.currentSimIdentity);
     const autoAllSims = !hasRequestedScope && requestedScope === 'all';
-    const includeAllSims = requestedSimSlot === null && requestedScope === 'all';
+    const wantsAllSims = requestedSimSlot === null && requestedScope === 'all';
+    const includeAllSims = wantsAllSims && (this.allowAllSimMessages || autoAllSims);
+    const allSimMessagesDenied = wantsAllSims && !includeAllSims;
 
     let effectiveScope = includeAllSims ? 'all' : 'current';
     let messages = this.receivedMessages;
@@ -328,8 +330,8 @@ class SMSProcessor {
         scope: effectiveScope,
         requestedScope,
         partitionBySim: this.partitionMessagesBySim,
-        allSimMessagesAllowed: this.allowAllSimMessages || includeAllSims || autoAllSims,
-        allSimMessagesDenied: false,
+        allSimMessagesAllowed: this.allowAllSimMessages || autoAllSims,
+        allSimMessagesDenied,
         simSlot: requestedSimSlot,
         currentSim,
         currentSimKnown: Boolean(currentSim?.simId)
