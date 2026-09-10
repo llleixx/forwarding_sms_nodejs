@@ -5,6 +5,7 @@ import EventEmitter from 'events';
 import fs from 'fs';
 import path from 'path';
 import logger from './logger.js';
+import { unlockSimPin, redactPin } from './sim-pin.js';
 
 class ModemManager extends EventEmitter {
   constructor(config, mobileDataConfig = {}, appConfig = {}) {
@@ -1003,6 +1004,14 @@ class ModemManager extends EventEmitter {
   }
 
   async refreshSimStatus(options = {}) {
+    if (this.appConfig.sim?.singleSim === true) {
+      const ready = await this.isCurrentSimReady();
+      this.sim = { ...this.sim, supported: false, canSwitch: false,
+        modeLabel: '单卡', activeSlot: 0, switchSlot: null, bindSlot: null,
+        slots: [{ ...this.sim.slots[0], active: true, present: ready }],
+        lastCheckedAt: new Date().toISOString(), error: ready ? '' : 'SIM未就绪' };
+      return this.getCachedSimStatus();
+    }
     const refreshIdentity = options.refreshIdentity === true;
     const probeSlots = options.probeSlots === true;
     const status = {
@@ -1414,6 +1423,7 @@ class ModemManager extends EventEmitter {
   }
 
   async forceMobileDataOff(stage) {
+    if (this.appConfig.lifecycle?.forceMobileDataOff === false) return this.getCachedMobileDataStatus();
     this.mobileData.desiredEnabled = false;
     try {
       return await this.disableMobileData({
@@ -1826,7 +1836,7 @@ class ModemManager extends EventEmitter {
       let buffer = '';
       const timer = setTimeout(() => {
         this.parser.removeListener('data', handler);
-        reject(new Error(`AT命令超时: ${cmd}`));
+        reject(new Error(`AT命令超时: ${redactPin(cmd)}`));
       }, timeout);
 
       const handler = (line) => {
@@ -1840,7 +1850,7 @@ class ModemManager extends EventEmitter {
 
       this.parser.on('data', handler);
 
-      logger.debug(`>> ${cmd}`);
+      logger.debug(`>> ${redactPin(cmd)}`);
       this.port.write(cmd + '\r\n');
     });
   }
@@ -1897,7 +1907,7 @@ class ModemManager extends EventEmitter {
    * 压缩AT响应，避免日志跨太多行
    */
   formatATResponse(resp) {
-    return resp
+    return redactPin(resp)
       .split('\n')
       .map(line => line.trim())
       .filter(Boolean)
@@ -1937,7 +1947,11 @@ class ModemManager extends EventEmitter {
     }
 
     // 3. 启动时先重置协议栈，避免上一次双卡切换/短信上报状态残留。
-    await this.resetProtocolStackForStartup();
+    if (this.appConfig.lifecycle?.resetProtocolStack !== false) {
+      await this.resetProtocolStackForStartup();
+    }
+    await this.ensureFullFunctionality();
+    await unlockSimPin(this.sendATCommand.bind(this), this.appConfig.sim);
 
     // 3.1. 查询双卡能力和当前卡槽；不支持时保持单卡运行。
     await this.refreshSimStatus({ refreshIdentity: false });
@@ -1954,13 +1968,15 @@ class ModemManager extends EventEmitter {
 
     // 5. 等待网络注册
     this.ready = await this.waitForNetworkRegistration('启动', 30, 2000);
+    if (!this.ready) throw new Error('LTE网络尚未注册');
 
     // 6. 驻网后再断开一次，防止模组自动拨号在驻网完成后重新拉起。
     await this.forceMobileDataOff('启动保护(驻网后)');
 
     // 7. 按文档配置短信功能，并启用本项目需要的PDU模式
     await this.configureSMS();
-    await this.refreshSimStatus({ refreshIdentity: true, probeSlots: true });
+    await this.refreshSimStatus({ refreshIdentity: true,
+      probeSlots: this.appConfig.lifecycle?.probeSimSlots !== false });
 
     logger.info('模组初始化完成');
     this.emit('ready');
@@ -2055,6 +2071,21 @@ class ModemManager extends EventEmitter {
   async configureSMS() {
     if (this.modelInfo.version.includes('ML307A-DL')) {
       throw new Error('当前ML307A-DL型号不支持短信功能');
+    }
+
+    if (this.modelInfo.model.startsWith('ML307X')) {
+      // These are the capabilities observed on ML307X-DC-MBRH1S00.
+      const formats = await this.sendATCommand('AT+CMGF=?');
+      const notify = await this.sendATCommand('AT+CNMI=?');
+      const charset = await this.sendATCommand('AT+CSCS=?');
+      if (!/\+CMGF:\s*\(0,1\)/.test(formats) ||
+          !/\+CNMI:\s*\(0-3\),\(0-3\),\(0-3\),\(0-2\),\(0-1\)/.test(notify) ||
+          !charset.includes('"IRA"')) throw new Error('ML307X短信能力与已验证固件不符');
+      for (const cmd of ['AT+CMGF=0', 'AT+CNMI=2,2,0,2,0', 'AT+CSCS="IRA"', 'AT+CSMP=33,167,0,0']) {
+        await this.sendATWithRetry(cmd, { retries: 1 });
+      }
+      logger.info('ML307X PDU短信与CNMI上报配置完成');
+      return null;
     }
 
     await this.sendATWithRetry('AT+CMGF=0', {

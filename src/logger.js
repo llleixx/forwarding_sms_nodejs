@@ -1,4 +1,5 @@
 import winston from 'winston';
+import { redactPin } from './sim-pin.js';
 
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
@@ -108,6 +109,8 @@ function addToBuffer(level, message, args = []) {
 // 拦截日志输出，同时写入缓冲区。winston的info/warn/error便捷方法不会走自定义log方法。
 const originalLog = logger.log.bind(logger);
 logger.log = function(level, message, ...args) {
+  message = redactPin(formatLogPart(message));
+  args = args.map(arg => redactPin(formatLogPart(arg)));
   addToBuffer(level, message, args);
   return originalLog(level, message, ...args);
 };
@@ -115,6 +118,8 @@ logger.log = function(level, message, ...args) {
 ['error', 'warn', 'info', 'debug'].forEach((level) => {
   const original = logger[level].bind(logger);
   logger[level] = function(message, ...args) {
+    message = redactPin(formatLogPart(message));
+    args = args.map(arg => redactPin(formatLogPart(arg)));
     addToBuffer(level, message, args);
     return original(message, ...args);
   };
