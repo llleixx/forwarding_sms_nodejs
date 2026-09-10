@@ -1,0 +1,28 @@
+# Optional ML307X profile; see DEPLOYMENT.md.
+services:
+  sms-forwarding:
+    build:
+      context: .
+    image: sms-forwarding:ml307x-local
+    container_name: sms-forwarding
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./config.json:/app/config.json
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./secrets/sim-pin:/run/secrets/sim-pin:ro
+      - /dev:/dev
+      - /sys:/sys:ro
+    device_cgroup_rules:
+      - "c 188:* rwm"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

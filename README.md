@@ -4,6 +4,13 @@
 
 项目同时提供 Web 管理台和 HTTP API，可用于查看模组状态、收件箱、日志、推送通道，发送短信，切换发送短信使用的 SIM，以及执行 AT 命令。
 
+## 此 Fork 的 ML307X 适配
+
+本 Fork 增加可选的启动保护、单卡模式与受保护的 PIN 自动解锁。
+[兼容与部署说明](DEPLOYMENT.md)区分应用功能、可选 USB 驱动 workaround 和实测限制；
+[验收记录](deploy/validation.md)列出已完成和待完成项目。
+原有部署文件保留；ML307X 示例需显式选择 `compose.ml307x.yml`。
+
 ## 界面预览
 
 ![SMS Forwarding Web 管理台预览](preview.png)

@@ -16,3 +16,6 @@ config.json
 AGENTS.md
 DESIGN.md
 ML307A_*.md
+
+secrets/
+baseline/

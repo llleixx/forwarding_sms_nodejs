@@ -14,3 +14,6 @@ config.json
 .npm-cache/
 *.tgz
 .eslintcache
+
+secrets/
+baseline/

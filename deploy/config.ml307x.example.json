@@ -1,0 +1,32 @@
+{
+  "serial": {
+    "path": "/dev/ml307x-at",
+    "baudRate": 115200,
+    "autoDetect": false
+  },
+  "lifecycle": {
+    "resetProtocolStack": false,
+    "forceMobileDataOff": false,
+    "probeSimSlots": false
+  },
+  "sim": {
+    "singleSim": true,
+    "pinFile": "/run/secrets/sim-pin",
+    "pinAttemptFile": "data/pin-attempt.json"
+  },
+  "mobileData": {
+    "cid": 1
+  },
+  "simCards": [],
+  "inbox": {
+    "maxReceivedMessages": 200,
+    "receivedMessagesFile": "data/received-messages.json",
+    "partitionBySim": false,
+    "allowAllSimMessages": true
+  },
+  "pushChannels": [],
+  "api": {
+    "port": 3000,
+    "webToken": "REPLACE_WITH_RANDOM_TOKEN"
+  }
+}
