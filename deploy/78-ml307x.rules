@@ -1,0 +1,4 @@
+ACTION=="add|change", SUBSYSTEM=="usb", ATTR{idVendor}=="2c91", ATTR{idProduct}=="0002", ENV{ID_MM_DEVICE_IGNORE}="1"
+ACTION=="add|change", SUBSYSTEM=="tty", ATTRS{idVendor}=="2c91", ATTRS{idProduct}=="0002", ENV{ID_MM_PORT_IGNORE}="1"
+ACTION=="add|change", SUBSYSTEM=="tty", ENV{ID_VENDOR_ID}=="2c91", ENV{ID_MODEL_ID}=="0002", ENV{ID_USB_INTERFACE_NUM}=="03", SYMLINK+="ml307x-at", MODE="0660", GROUP="dialout"
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="2c91", ATTR{idProduct}=="0002", RUN+="/usr/bin/systemctl --no-block restart ml307x-serial.service"
